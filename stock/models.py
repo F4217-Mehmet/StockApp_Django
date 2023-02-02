@@ -59,10 +59,6 @@ class Purchases(UpdateCreate):
     
     def __str__(self):
         return f'{self.product} - {self.quantity}'
-        
-    class Meta:
-        verbose_name = "Purchases"
-        verbose_name_plural = "Purchases"
     
 class Sales(UpdateCreate):
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
@@ -75,7 +71,3 @@ class Sales(UpdateCreate):
     
     def __str__(self):
         return f'{self.product} - {self.quantity}'
-
-    class Meta:
-        verbose_name = "Sales"
-        verbose_name_plural = "Sales"
