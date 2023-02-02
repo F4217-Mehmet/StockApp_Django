@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     # my_apps
     'account',
     
+    
     # drf
     'rest_framework',
     'rest_framework.authtoken',
