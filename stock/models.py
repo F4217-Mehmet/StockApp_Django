@@ -15,6 +15,10 @@ class Category(models.Model):
     def __str__(self):
         return self.name
     
+    class Meta:
+        verbose_name = "Category"
+        verbose_name_plural = "Categories"
+    
 
 class Brand(models.Model):
     name = models.CharField(max_length=25, unique=True)
@@ -42,7 +46,6 @@ class Firm(UpdateCreate):
 
     def __str__(self):
         return self.name
-    
 
 class Purchases(UpdateCreate):
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
@@ -56,7 +59,6 @@ class Purchases(UpdateCreate):
     
     def __str__(self):
         return f'{self.product} - {self.quantity}'
-    
     
 class Sales(UpdateCreate):
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
