@@ -8,7 +8,6 @@ class UpdateCreate(models.Model):
     class Meta:
         abstract = True
 
-
 class Category(models.Model):
     name = models.CharField(max_length=25)
     
@@ -19,7 +18,6 @@ class Category(models.Model):
         verbose_name = "Category"
         verbose_name_plural = "Categories"
     
-
 class Brand(models.Model):
     name = models.CharField(max_length=25, unique=True)
     image = models.TextField()
