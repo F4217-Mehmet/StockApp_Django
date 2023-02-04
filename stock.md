@@ -219,8 +219,8 @@ A- Eğer Djangonun default FILTER ayarlarını kullanacaksak, iki farklı şekil
                   from django_filters.rest_framework import DjangoFilterBackend
 
                   # view'da filter_backends ve filterset_fields ekleyip, filitrelenecek alanları yazıyoruz,
-                  filter_backends = [DjangoFilterBackend]                 #? hangi filitrelemeyi kullanacak,
-                  filterset_fields = ["id", "first_name", "last_name"]    #? nerede filitrelemeyi kullanacak,
+                  filter_backends = [DjangoFilterBackend]                 #? hangi filtrelemeyi kullanacak,
+                  filterset_fields = ["id", "first_name", "last_name"]    #? nerede filtrelemeyi kullanacak,
                   # (hangisini kullanacaksan adını yaz)
 
 #todo, B- Djangonun default ayarları dışında customize bir FILTER kullanmak için, filter.py ekle;
@@ -228,3 +228,103 @@ A- Eğer Djangonun default FILTER ayarlarını kullanacaksak, iki farklı şekil
 daha sonra paginationda yapıldığı gibi default filter ayarları miras alınarak custom bir filter yazılabilir ve view'da import edilip kullanılabilir.
 
 **BİLGİ NOTU SONU**
+
+14. Şimdi de tek bir kategori çektiğimde, o kategorideki productları da görmek istiyorum. Bu işlemi **serializerda** yapacağım
+
+class ProductSerializer(serializers.ModelSerializer):
+    
+    category = serializers.StringRelatedField()
+    brand = serializers.StringRelatedField()
+    brand_id = serializers.IntegerField()
+    category_id = serializers.IntegerField()
+
+    class Meta:
+        model = Product
+        fields = (
+            "id",
+            "name",
+            "category",
+            "category_id",
+            "brand",
+            "brand_id",
+            "stock",
+        )
+
+        read_only_fields = ("stock",)
+
+class CategoryProductSerializer(serializers.ModelSerializer):
+    
+    products = ProductSerializer(many=True) 
+**products= modeldeki related name'i kullanmak zorundayım. Buradaki products, productserializerdan geçerek buraya yazılacak** **bir kategoride birden çok product olacağı için many=true**
+    product_count = serializers.SerializerMethodField()  # read_only
+    
+    class Meta:
+        model = Category
+        fields = ("id", "name", "product_count", "products")
+        
+    def get_product_count(self, obj):
+        return Product.objects.filter(category_id=obj.id).count()
+
+15. yeni oluşturduğum serializerı view'e ekliyorum
+
+from .serializers import ..., CategoryProductSerializer,
+
+class CategoryView(viewsets.ModelViewSet):
+        ...
+        ...
+
+    def get_serializer_class(self):
+**category name'i varsa CategoryProductSerializer'ı dön diyeceğim**
+        if self.request.query_params.get("name"): 
+            return CategoryProductSerializer
+**eğer name yoksa super().get_serializer_class()'ı çalıştır**
+        return super().get_serializer_class()
+
+16. **permission** düzenliyorum. **Djangonun user bazında ve grup olarak permission belirleme özelliğinden yararlanacağım. Adminde bunları yapabilmek için, projenin bunu algılaması için aşağıdaki işlemleri yapıyorum.**
+
+from rest_framework.permissions import DjangoModelPermissions
+
+**sonrasında ihtiyaç olan viewlerin altına bunu ekliyorum. Örn;**
+
+class CategoryView(viewsets.ModelViewSet):
+    ...
+    ...
+    permission_classes=[DjangoModelPermissions]
+
+17. account klasöründe signals file içinde **read_only** ayarı yapıyorum ve admin panele gidip read_only grubu oluşturarak sadece view yetkisi verdim. Normal user olarak register olanlar otomatikman read_only yetkisine sahip olacak. Her bir kişi için yada gruplar halinde admin panelde yukarıdaki işlemlerim sonucunda yetki tanımlamaları yapabilirim.
+
+receiver(post_save, sender=User)
+def create_auth_token(sender, instance=None, created=False, **kwargs):
+    if created:
+        Token.objects.create(user=instance)  
+        user= User.objects.get(username = instance)
+        if not user.is_superuser:
+            group = Group.objects.get(name='Read_Only') 
+            user.groups.add(group)
+            user.save()
+
+18. **Herhangi bir kişiyi bir gruba eklediğimde admin panelde grup isminin de görünmesi için** account  içinde admin.py'da;
+
+from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin
+
+from django.contrib.auth.models import User
+
+
+class UserAdminWithGroup(UserAdmin):
+    def group_name(self, obj):
+        queryset = obj.groups.values_list('name', flat=True)
+        groups = []
+        for group in queryset:
+            groups.append(group)
+
+        return ' '.join(groups)
+
+    list_display = UserAdmin.list_display + ('group_name',)
+
+
+admin.site.unregister(User)
+admin.site.register(User, UserAdminWithGroup)
+
+
+
