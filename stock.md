@@ -140,13 +140,12 @@ from django.shortcuts import render
 from rest_framework import viewsets, filters **filters ile search özelliği ekledim**
 from .models import Category, Brand, Product, Firm, Purchases, Sales
 from .serializers import CategorySerializer, CategoryProductSerializer
-from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.permissions import DjangoModelPermissions
 
 class CategoryView(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
-    filter_backends = [filters.SearchFilter, DjangoFilterBackend] **search**
+    filter_backends = [filters.SearchFilter] **search**
     search_fields = ['name'] **search**
     filterset_fields = ["name"]
     permission_classes=[DjangoModelPermissions]
@@ -175,3 +174,23 @@ router.register("categories", CategoryView)
 urlpatterns = [
     
 ] + router.urls  **router'a register ettiğim endpointleri bu şekilde urlpatternse ekliyorum**
+
+13. Endpointe **filtreleme** ekliyorum. bunun için de dokümanda restframework, API guide içinde DjangoFilterBackend'den yararlanıyorum.
+
+pip install django-filter
+
+main settings'de installed apps'e ekliyorum.
+INSTALLED_APPS = [
+    ...
+    # drf
+    ...
+    'django_filters',
+]
+
+sonra view'e gelip import yapıp Categoryview'e ekliyorum
+
+from django_filters.rest_framework import DjangoFilterBackend
+
+class CategoryView(viewsets.ModelViewSet):
+    ...
+    filter_backends = [..., DjangoFilterBackend] **filter**
