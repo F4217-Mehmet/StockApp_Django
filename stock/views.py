@@ -1,9 +1,10 @@
 from django.shortcuts import render
-from rest_framework import viewsets, filters
+from rest_framework import viewsets, filters, status
 from .models import Category, Brand, Product, Firm, Purchases, Sales
-from .serializers import CategorySerializer, CategoryProductSerializer, BrandSerializer, FirmSerializer, ProductSerializer
+from .serializers import CategorySerializer, CategoryProductSerializer, BrandSerializer, FirmSerializer, ProductSerializer, PurchasesSerializer
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.permissions import DjangoModelPermissions
+from rest_framework.response import Response
 
 class CategoryView(viewsets.ModelViewSet):
     queryset = Category.objects.all()
@@ -42,3 +43,34 @@ class ProductView(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['category', 'brand']
     search_fields = ['name']
+    
+
+class PurchaseView(viewsets.ModelViewSet):
+    queryset = Purchases.objects.all()
+    serializer_class = PurchasesSerializer
+    permission_classes = [DjangoModelPermissions]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['firm', 'product']
+    search_fields = ['firm']    
+    
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        #! #############  ADD Product Stock ############
+        
+        purchase = request.data
+        product = Product.objects.get(id=purchase["product_id"])
+        product.stock += purchase["quantity"]
+        product.save()
+        
+        #! #############################################
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+    
+    
+    
+    
