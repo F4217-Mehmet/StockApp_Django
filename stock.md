@@ -50,6 +50,7 @@ class Product(UpdateCreate):
     brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name="b_products") 
 **bazen hata verdiği için burada productsa farklı related name (b_products) verdim**
     stock = models.PositiveSmallIntegerField(blank=True, default=0)
+**blank=True demek, frontendden gelirken böyle bir data gelmezse sıkıntı çıkarma, serializerın validasyonunda geçiyor. ama db'den geçemez, çünkü null=True değil. o yüzden db'ye kaydetmeden önce bu fieldı eklemem gerekiyor**
 
     
     def __str__(self):
@@ -75,6 +76,7 @@ class Purchases(UpdateCreate):
     quantity = models.PositiveSmallIntegerField()
     price = models.DecimalField(max_digits=6, decimal_places=2)
     price_total = models.DecimalField(max_digits=8, decimal_places=2, blank=True)
+**blank=True demek, frontendden gelirken böyle bir data gelmezse sıkıntı çıkarma, serializerın validasyonunda geçiyor. ama db'den geçemez, çünkü null=True değil. o yüzden db'ye kaydetmeden önce bu fieldı eklemem gerekiyor**
 
     
     def __str__(self):
@@ -88,6 +90,7 @@ class Sales(UpdateCreate):
     quantity = models.PositiveSmallIntegerField()
     price = models.DecimalField(max_digits=6, decimal_places=2)
     price_total = models.DecimalField(max_digits=8, decimal_places=2, blank=True)
+**blank=True demek, frontendden gelirken böyle bir data gelmezse sıkıntı çıkarma, serializerın validasyonunda geçiyor. ama db'den geçemez, çünkü null=True değil. o yüzden db'ye kaydetmeden önce bu fieldı eklemem gerekiyor**
 
     
     def __str__(self):
@@ -229,29 +232,16 @@ daha sonra paginationda yapıldığı gibi default filter ayarları miras alına
 
 **BİLGİ NOTU SONU**
 
-14. Şimdi de tek bir kategori çektiğimde, o kategorideki productları da görmek istiyorum. Bu işlemi **serializerda** yapacağım
+14. Şimdi de tek bir kategori çektiğimde, o kategorideki productları da görmek istiyorum. İleride ekstra özellik katacağım product classını **serializerda** oluşturmaya başlıyorum.
 
 class ProductSerializer(serializers.ModelSerializer):
     
-    category = serializers.StringRelatedField()
-    brand = serializers.StringRelatedField()
-    brand_id = serializers.IntegerField()
-    category_id = serializers.IntegerField()
-
     class Meta:
         model = Product
-        fields = (
-            "id",
-            "name",
-            "category",
-            "category_id",
-            "brand",
-            "brand_id",
-            "stock",
-        )
+        fields = "__all__"
 
-        read_only_fields = ("stock",)
 
+**categoryproduct**
 class CategoryProductSerializer(serializers.ModelSerializer):
     
     products = ProductSerializer(many=True) 
@@ -326,5 +316,233 @@ class UserAdminWithGroup(UserAdmin):
 admin.site.unregister(User)
 admin.site.register(User, UserAdminWithGroup)
 
+19. **Brand Serializer'ı** oluşturuyorum. Sırasıyla **view** ve **url** yapacağım.
+
+class BrandSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Brand
+        fields = (
+            'id',
+            'name',
+            'image'
+        )
+
+**view**
+from .models import ..., Brand
+from .serializers import ..., ..., BrandSerializer
+
+class BrandView(viewsets.ModelViewSet):
+    queryset = Brand.objects.all()
+    serializer_class = BrandSerializer
+    permission_classes = [DjangoModelPermissions]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['name']
+
+**endpoint**
+from .views import ..., BrandView
+
+router = routers.DefaultRouter()
+
+...
+router.register("brands", BrandView)
+
+20. **Firm Serializer'ı** oluşturuyorum. Sırasıyla **view** ve **url** yapacağım.
+
+class FirmSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Firm
+        fields = (
+            'id',
+            'name',
+            'phone',
+            'image',
+            'address'
+        )
+
+**view**
+from .models import ..., ..., ..., Firm
+from .serializers import ..., ..., FirmSerializer
+class FirmView(viewsets.ModelViewSet):
+    queryset = Firm.objects.all()
+    serializer_class = FirmSerializer
+    permission_classes = [DjangoModelPermissions]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['name']
+
+**endpoint**
+from .views import ..., ..., FirmView
+
+router = routers.DefaultRouter()
+
+...
+router.register("firms", FirmView)
 
 
+21. **Product classına yeni özellikler** ekliyorum
+
+class ProductSerializer(serializers.ModelSerializer):
+
+ **db'de id'lerin yanı sıra isimler de gelsin istiyorum**   
+    category = serializers.StringRelatedField() **burası aslında modelsdaki category tablosundaki str!!!**
+    brand = serializers.StringRelatedField()
+    <!-- brand_id = serializers.IntegerField()
+    category_id = serializers.IntegerField() -->
+
+    class Meta:
+        model = Product
+        fields = (
+            "id",
+            "name",
+            "category",
+            "category_id",
+            "brand",
+            "brand_id",
+            "stock",
+        )
+**stock field sales ve purchase ile değişeceğinden read only olacak**
+        read_only_fields = ("stock",) 
+
+**view**
+from .serializers import ..., ..., ProductSerializer
+from .models import ..., ..., Product
+
+class ProductView(viewsets.ModelViewSet):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+    permission_classes = [DjangoModelPermissions]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['category', 'brand']
+    search_fields = ['name']
+
+**endpointi**
+from .views import ..., ..., ..., ProductView,
+
+router = routers.DefaultRouter()
+
+router.register("products", ProductView)
+
+22. şimdi **purchase** classını oluşturuyorum
+
+class PurchasesSerializer(serializers.ModelSerializer):
+    
+    user = serializers.StringRelatedField() 
+    firm = serializers.StringRelatedField()
+    brand = serializers.StringRelatedField()
+    product = serializers.StringRelatedField()
+    product_id = serializers.IntegerField()
+    brand_id = serializers.IntegerField()
+    firm_id = serializers.IntegerField()
+    category = serializers.SerializerMethodField()
+    time_hour = serializers.SerializerMethodField()
+    createds = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Purchases
+        fields = (
+            "id",
+            "user",
+            "user_id",
+            "category",
+            "firm",
+            "firm_id",
+            "brand",
+            "brand_id",
+            "product",
+            "product_id",
+            "quantity",
+            "price",
+            "price_total", 
+**price_total'ı burada, view içerisinde yapabilirim ama signal kullanarak yapacağım**
+            "time_hour",
+            "createds",
+        )
+**view**
+from .models import ..., ..., ..., ..., Purchases
+from .serializers import ..., .., ..., ..., ..., PurchasesSerializer
+
+class PurchaseView(viewsets.ModelViewSet):
+    queryset = Purchases.objects.all()
+    serializer_class = PurchasesSerializer
+    permission_classes = [DjangoModelPermissions]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['firm', 'product']
+    search_fields = ['firm']    
+    
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        #! #############  ADD Product Stock ############
+        
+        purchase = request.data
+        product = Product.objects.get(id=purchase["product_id"])
+        product.stock += purchase["quantity"]
+        product.save()
+        
+        #! #############################################
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)         
+    
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        
+        #! #############  UPDATE Product Stock ############
+        purchase = request.data
+        product = Product.objects.get(id=instance.product_id)
+        
+        sonuc = purchase["quantity"] - instance.quantity
+        product.stock += sonuc
+        product.save()
+        #! #############################################
+        self.perform_update(serializer)
+
+        if getattr(instance, '_prefetched_objects_cache', None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
+
+        return Response(serializer.data)
+    
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        
+        product = Product.objects.get(id=instance.product_id)
+        product.stock -= instance.quantity
+        product.save()
+        
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+**endpoint**
+from .views import ..., ..., ..., ..., PurchaseView
+
+router = routers.DefaultRouter()
+
+router.register("purchases", PurchaseView) 
+
+22. **SIGNALS**
+**price total'i hesaplamak için** stock içerisinde yeni bir signals file açıyorum. 
+
+from django.db.models.signals import pre_save 
+**!!!pre_save=purchase tablosunda purchase objesini db'ye save etmeden önce price_total'i hesaplayıp purchase objesine ekleyip db'de o şekilde save edeceğim. Çünkü price_total, blank=True olduğundan db'ye kaydetmeden önce bunu eklemem lazım.!!!**
+from django.dispatch import receiver
+from .models import Purchases, Sales
+
+
+@receiver(pre_save, sender=Purchases) **signal'i gönderen purchases tablom**
+def calculate_total_price(sender, instance, **kwargs):
+    instance.price_total = instance.quantity * instance.price
+    
+@receiver(pre_save, sender=Sales)
+def calculate_total_price(sender, instance, **kwargs):
+    instance.price_total = instance.quantity * instance.price
+
+**signal kullandığım için apps.py içerisinde aşağıdaki metodu yazdım**
+    def ready(self):
+        import stock.signals
