@@ -122,6 +122,7 @@ python manage.py createsuperuser
 
 from rest_framework import serializers
 from .models import Category, Brand, Product, Firm, Purchases, Sales
+import datetime
 
 class CategorySerializer(serializers.ModelSerializer):
     product_count = serializers.SerializerMethodField()  # read_only
@@ -456,6 +457,26 @@ class PurchasesSerializer(serializers.ModelSerializer):
             "time_hour",
             "createds",
         )
+**purchase içerisinde kategorinin de gelmesini istiyorum. Bunu da SerizalizerMethodField ile yapıyorum**
+  # def get_category(self, obj):
+    #     product = Product.objects.get(id=obj.product_id)
+    #     return Category.objects.get(id=product.category_id).name
+
+**bu daha clean bir yöntem**    
+    def get_category(self, obj):  
+        return obj.product.category.name
+
+ **datetime'ı import et, time_hour'u field'a ekle**
+
+    def get_time_hour(self, obj):
+        return datetime.datetime.strftime(obj.createds, "%H:%M")
+
+ **3 aşama: 1-field'ı belirle, 2. methodu yaz 3. fieldlara ekle**      
+    def get_createds(self, obj):
+        return datetime.datetime.strftime(obj.createds, "%d,%m,%Y")
+
+**böylelikle purchase'im gün ay yıl ve saat olarak kullanıcı dostu bir data olarak dönmüş oluyor**
+
 **view**
 from .models import ..., ..., ..., ..., Purchases, Sales
 from .serializers import ..., .., ..., ..., ..., PurchasesSerializer
@@ -514,7 +535,8 @@ class PurchaseView(viewsets.ModelViewSet):
             instance._prefetched_objects_cache = {}
 
         return Response(serializer.data)
-    
+
+**purchase'i delete edeceğim şimdi, destroymodelmixin'den alıyorum. Mevcut instance'ın quantity'si kadarını stoktan düşüyorum.**
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         

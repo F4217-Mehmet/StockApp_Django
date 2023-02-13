@@ -110,7 +110,7 @@ class PurchasesSerializer(serializers.ModelSerializer):
         return datetime.datetime.strftime(obj.createds, "%H:%M")
     
     def get_createds(self, obj):
-        return datetime.datetime.strftime(obj.createds, "%d,%m,%Y")
+        return datetime.datetime.strftime(obj.createds, "%d.%m.%Y")
     
     
     
