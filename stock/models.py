@@ -54,6 +54,9 @@ class Purchases(UpdateCreate):
     price = models.DecimalField(max_digits=6, decimal_places=2)
     price_total = models.DecimalField(max_digits=8, decimal_places=2, blank=True)
 
+    class Meta:
+        verbose_name = "Purchases"
+        verbose_name_plural = "Purchases"
     
     def __str__(self):
         return f'{self.product} - {self.quantity}'
@@ -66,6 +69,9 @@ class Sales(UpdateCreate):
     price = models.DecimalField(max_digits=6, decimal_places=2)
     price_total = models.DecimalField(max_digits=8, decimal_places=2, blank=True)
 
-    
+    class Meta:
+        verbose_name = "Sales"
+        verbose_name_plural = "Sales" 
+        
     def __str__(self):
         return f'{self.product} - {self.quantity}'

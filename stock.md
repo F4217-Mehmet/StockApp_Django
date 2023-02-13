@@ -457,8 +457,9 @@ class PurchasesSerializer(serializers.ModelSerializer):
             "createds",
         )
 **view**
-from .models import ..., ..., ..., ..., Purchases
+from .models import ..., ..., ..., ..., Purchases, Sales
 from .serializers import ..., .., ..., ..., ..., PurchasesSerializer
+from rest_framework.response import Response
 
 class PurchaseView(viewsets.ModelViewSet):
     queryset = Purchases.objects.all()
@@ -468,14 +469,17 @@ class PurchaseView(viewsets.ModelViewSet):
     filterset_fields = ['firm', 'product']
     search_fields = ['firm']    
     
+**modelviewsetten createmodelmixin'e geldim, buradaki create metodunu alıyorum. purchase create edilirken, ilgili productın stoğunu da güncelleyeceğim** 
+**Sales ve Response'u da import ediyorum**
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         #! #############  ADD Product Stock ############
-        
-        purchase = request.data
-        product = Product.objects.get(id=purchase["product_id"])
-        product.stock += purchase["quantity"]
+
+**gelen datayı purchase değişkenine atadım, ilgili productı tablodan çektim ve productın stok miktarını quantity kadar artırıyorum**
+        purchase = request.data 
+        product = Product.objects.get(id=purchase["product_id"]) 
+        product.stock += purchase["quantity"] 
         product.save()
         
         #! #############################################
@@ -484,19 +488,21 @@ class PurchaseView(viewsets.ModelViewSet):
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)         
+        serializer.save(user=self.request.user) **purchase'i kimin yaptığını burada belirtiyorum**   
     
+**Purchase'i update etme özelliğini ekliyorum. updatemodelmixin'deki update kısmını aldım.**
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
-        instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
-        serializer.is_valid(raise_exception=True)
+        instance = self.get_object() **mevcut instance'ı alıyorum**
+        serializer = self.get_serializer(instance, data=request.data, partial=partial) **serializer'da instance ile gelen datayı karşılaştırıyorum**
+        serializer.is_valid(raise_exception=True) **gelen data validse mevcut instance'a gelen datayı kaydediyor**
         
         #! #############  UPDATE Product Stock ############
-        purchase = request.data
+**purchase ve productı çekiyorum**
+        purchase = request.data **yeni gelen data**
         product = Product.objects.get(id=instance.product_id)
-        
-        sonuc = purchase["quantity"] - instance.quantity
+ **şimdi logici kuruyorum**       
+        sonuc = purchase["quantity"] - instance.quantity **purchase data ve instance obje olduğundan farklı yöntemlerle ulaştım**
         product.stock += sonuc
         product.save()
         #! #############################################
@@ -546,3 +552,4 @@ def calculate_total_price(sender, instance, **kwargs):
 **signal kullandığım için apps.py içerisinde aşağıdaki metodu yazdım**
     def ready(self):
         import stock.signals
+
