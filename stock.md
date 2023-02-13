@@ -78,7 +78,9 @@ class Purchases(UpdateCreate):
     price_total = models.DecimalField(max_digits=8, decimal_places=2, blank=True)
 **blank=True demek, frontendden gelirken böyle bir data gelmezse sıkıntı çıkarma, serializerın validasyonunda geçiyor. ama db'den geçemez, çünkü null=True değil. o yüzden db'ye kaydetmeden önce bu fieldı eklemem gerekiyor**
 
-    
+    class Meta:
+        verbose_name = "Purchases"
+        verbose_name_plural = "Purchases"
     def __str__(self):
         return f'{self.product} - {self.quantity}'
 
@@ -92,7 +94,9 @@ class Sales(UpdateCreate):
     price_total = models.DecimalField(max_digits=8, decimal_places=2, blank=True)
 **blank=True demek, frontendden gelirken böyle bir data gelmezse sıkıntı çıkarma, serializerın validasyonunda geçiyor. ama db'den geçemez, çünkü null=True değil. o yüzden db'ye kaydetmeden önce bu fieldı eklemem gerekiyor**
 
-    
+    class Meta:
+        verbose_name = "Sales"
+        verbose_name_plural = "Sales"
     def __str__(self):
         return f'{self.product} - {self.quantity}'
 
@@ -566,12 +570,145 @@ from .models import Purchases, Sales
 @receiver(pre_save, sender=Purchases) **signal'i gönderen purchases tablom**
 def calculate_total_price(sender, instance, **kwargs):
     instance.price_total = instance.quantity * instance.price
-    
-@receiver(pre_save, sender=Sales)
-def calculate_total_price(sender, instance, **kwargs):
-    instance.price_total = instance.quantity * instance.price
+
+
 
 **signal kullandığım için apps.py içerisinde aşağıdaki metodu yazdım**
     def ready(self):
         import stock.signals
 
+23. Sales'e geçiyorum, öncelikle **serializer'ı** yazıyorum.
+
+class SalesSerializer(serializers.ModelSerializer):
+    
+    user = serializers.StringRelatedField() 
+    brand = serializers.StringRelatedField()
+    product = serializers.StringRelatedField()
+    product_id = serializers.IntegerField()
+    brand_id = serializers.IntegerField()
+    # category = serializers.SerializerMethodField()
+    time_hour = serializers.SerializerMethodField()
+    createds = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Sales
+        fields = (
+            "id",
+            "user",
+            "user_id",
+            # "category",
+            "brand",
+            "brand_id",
+            "product",
+            "product_id",
+            "quantity",
+            "price",
+            "price_total",
+            "time_hour",
+            "createds",
+        )
+        
+    # def get_category(self, obj):
+    #     return obj.product.category.name
+    
+    def get_time_hour(self, obj):
+        return datetime.datetime.strftime(obj.createds, "%H:%M")
+    
+    def get_createds(self, obj):
+        return datetime.datetime.strftime(obj.createds, "%d,%m,%Y")
+
+**Sales (View)**
+
+class SalesView(viewsets.ModelViewSet):
+    queryset = Sales.objects.all()
+    serializer_class = SalesSerializer
+    permission_classes = [DjangoModelPermissions]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['brand','product']
+    search_fields = ['brand']
+    
+    def create(self, request, *args, **kwargs): **createmodelmixin'den**
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        #! #############  REDUCE Product Stock ############
+        
+        sales = request.data
+        product = Product.objects.get(id=sales["product_id"])
+        
+        if sales["quantity"] <= product.stock:
+            product.stock -= sales["quantity"]
+            product.save()
+        else:
+            data = {
+                "message": f"There's not enough product, current stock is {product.stock}"
+            }
+            return Response(data=data, status=status.HTTP_400_BAD_REQUEST)
+        
+        #! #############################################
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(data=serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+        
+        
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        
+        #!####### UPDATE Product Stock ########
+        sale = request.data
+        product= Product.objects.get(id=instance.product_id) 
+        
+        if sale["quantity"] > instance.quantity:
+            
+            if sale["quantity"] <= instance.quantity + product.stock:
+                product.stock = instance.quantity + product.stock - sale["quantity"]
+                product.save()
+            else:
+                data = {
+                "message": f"There's not enough product, current stock is {product.stock}"
+                }
+                return Response(data=data, status=status.HTTP_400_BAD_REQUEST)
+            
+        elif instance.quantity >= sale["quantity"]:
+            product.stock += instance.quantity - sale["quantity"]
+            product.save()
+         
+        #!##################################
+        self.perform_update(serializer)
+
+        if getattr(instance, '_prefetched_objects_cache', None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
+
+        return Response(serializer.data)
+    
+    
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        
+        #!####### DELETE Product Stock ########
+        product = Product.objects.get(id=instance.product_id)
+        product.stock += instance.quantity
+        product.save()
+        #!##################################
+        
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+**signals**
+**price total hesaplaması için signalsi de ekledim**
+
+@receiver(pre_save, sender=Sales)
+def calculate_total_price(sender, instance, **kwargs):
+    instance.price_total = instance.quantity * instance.price
+
+**endpoint**
+from .views import ..., ..., ..., ..., SalesView
+
+router.register("sales", SalesView) 

@@ -158,7 +158,7 @@ class SalesView(viewsets.ModelViewSet):
                 product.save()
             else:
                 data = {
-                "message": f"Dont have enough stock, current stock is {product.stock}"
+                "message": f"There's not enough product, current stock is {product.stock}"
                 }
                 return Response(data=data, status=status.HTTP_400_BAD_REQUEST)
             
